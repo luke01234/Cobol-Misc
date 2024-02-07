@@ -19,10 +19,13 @@
        01  WS-BOARD-HEIGHT   PIC 9(2)    VALUE 20.
        01  WS-BOARD-WIDTH    PIC 9(2)    VALUE 10.
       
+       01  WS-EMPTY-SPACE          PIC X(1) VALUE ".".
+
        01  WS-BOARD.       
            05  WS-BOARD-ROW OCCURS 20 TIMES.
                06  WS-BOARD-COLS OCCURS 10 TIMES.
-                   07  WS-BOARD-VAL    PIC X(1) VALUE "/".
+                   07  WS-BOARD-VAL    PIC X(1) VALUE ".".
+       
 
       *=================================================================
       *   GAME STATE AND SCORE
@@ -35,7 +38,9 @@
       *   PLAYER MOVEMENT VARS
       *=================================================================
 
-       01  WS-PLACE-PIECE    PIC 9(1).
+       01  WS-PIECE-COLLISION    PIC 9(1).
+
+       01  WS-CAN-MOVE       PIC 9(1).
 
        01  WS-REL-PLAYERPOS-LS.
            05 WS-REL-ROW  PIC 9(2) VALUE 01.
@@ -49,11 +54,13 @@
        
        01  WS-INP            PIC X(1).
 
+       01  WS-DIR            PIC X(1).
+
       *=================================================================
       *   TIME VARS
       *=================================================================
 
-       01  WS-TIME-BEFORE-DROP         PIC 9(4) VALUE 200.
+       01  WS-TIME-BEFORE-DROP         PIC 9(4) VALUE 100.
        01  WS-LAST-DROP-TIME           PIC 9(13).
 
        01  WS-TIME-SINCE-DROP          PIC 9(13).
@@ -89,20 +96,24 @@
 
        PROCEDURE DIVISION.
        MAIN-PARA.
+       
+      *=================================================================
+      *   Initialization
+      *=================================================================
 
        SET ENVIRONMENT "COB_TIMEOUT_SCALE" TO "3"
        PERFORM START-CLOCK-PARA.
        PERFORM CALCULATE-BOUNDS-PARA.
        CALL "MAKE_BORDER" USING 
        WS-BOARD-POS-LS WS-BOARD-HEIGHT WS-BOARD-WIDTH.
-       MOVE WS-PIECE-START-POS TO WS-REL-PLAYERPOS-LS.
-       MOVE WS-PIECE-START-POS TO WS-PREV-PLAYERPOS-LS.
+       PERFORM RESET-POSITION-PARA.
 
       *=================================================================
       *    GAME LOOP START
       *=================================================================
 
        PERFORM UNTIL WS-GAME-ON = WS-INP
+
        PERFORM CLOCK-PARA
        ACCEPT WS-INP AT 5001 WITH AUTO-SKIP TIME-OUT AFTER 1000
        PERFORM PLAYER-MOVE-PARA
@@ -114,7 +125,7 @@
        ADD 1 TO WS-SCORE
 
        DISPLAY WS-REL-PLAYERPOS-LS AT 0301
-
+      * MOVE WS-BOARD-ROW(1) TO WS-BOARD-ROW(20)
        END-PERFORM.
       *=================================================================
       *    GAME LOOP END
@@ -137,14 +148,12 @@
 
        PLAYER-MOVE-PARA.
        MOVE FUNCTION UPPER-CASE (WS-INP) TO WS-INP.
+       MOVE WS-INP TO WS-DIR
        EVALUATE WS-INP
        WHEN "A"
-       IF WS-REL-COL <> LO-LEFT-BOUND THEN
-       ADD -1 TO WS-REL-COL
+       PERFORM HORIZONTAL-MOVE-PARA
        WHEN "D"
-       IF WS-REL-COL <> LO-RIGHT-BOUND THEN
-       ADD 1 TO WS-REL-COL
-       END-IF
+       PERFORM HORIZONTAL-MOVE-PARA
        WHEN "W"
        IF WS-REL-ROW <> LO-TOP-BOUND THEN
        COMPUTE WS-REL-ROW = WS-REL-ROW
@@ -159,25 +168,61 @@
       *=================================================================
       *   CHECK BELOW PIECE TO SEE IF IT SHOULD BE PLACED
       *================================================================= 
-
-       CHECK-BELOW-PIECE.
-       COMPUTE LO-TEMP-NUM = WS-REL-ROW + 1.
-       MOVE WS-BOARD-COLS(LO-TEMP-NUM,WS-REL-COL) TO LO-TEMP-CHAR.
-       IF LO-TEMP-CHAR = "A" THEN
-       MOVE 1 TO WS-PLACE-PIECE
-       ELSE IF LO-TEMP-NUM > WS-BOARD-HEIGHT
-       MOVE 1 TO WS-PLACE-PIECE
-       ELSE 
-       MOVE 0 TO WS-PLACE-PIECE
-       END-IF.
        
+       CHECK-BEFORE-MOVE-PARA.
+       EVALUATE WS-DIR
+       WHEN "S"
+       COMPUTE LO-TEMP-NUM = WS-REL-ROW + 1
+       MOVE WS-BOARD-COLS(LO-TEMP-NUM,WS-REL-COL) TO LO-TEMP-CHAR
+       IF LO-TEMP-CHAR <> WS-EMPTY-SPACE THEN
+       MOVE 1 TO WS-PIECE-COLLISION
+       ELSE IF LO-TEMP-NUM > WS-BOARD-HEIGHT
+       MOVE 1 TO WS-PIECE-COLLISION
+       ELSE 
+       MOVE 0 TO WS-PIECE-COLLISION
+       END-IF
+       WHEN "A"
+       COMPUTE LO-TEMP-NUM = WS-REL-COL - 1
+       MOVE WS-BOARD-COLS(WS-REL-ROW,LO-TEMP-NUM) TO LO-TEMP-CHAR
+       IF LO-TEMP-CHAR <>    WS-EMPTY-SPACE THEN
+       MOVE 1 TO WS-PIECE-COLLISION
+       ELSE IF LO-TEMP-NUM < 1
+       MOVE 1 TO WS-PIECE-COLLISION
+       ELSE 
+       MOVE 0 TO WS-PIECE-COLLISION
+       END-IF
+       WHEN "D"
+       COMPUTE LO-TEMP-NUM = WS-REL-COL + 1
+       MOVE WS-BOARD-COLS(WS-REL-ROW,LO-TEMP-NUM) TO LO-TEMP-CHAR
+       IF LO-TEMP-CHAR <> WS-EMPTY-SPACE THEN
+       MOVE 1 TO WS-PIECE-COLLISION
+       ELSE IF LO-TEMP-NUM > 10
+       MOVE 1 TO WS-PIECE-COLLISION
+       ELSE 
+       MOVE 0 TO WS-PIECE-COLLISION
+       END-IF
+       END-EVALUATE.
+
+       HORIZONTAL-MOVE-PARA.
+       MOVE WS-INP TO WS-DIR.
+       PERFORM CHECK-BEFORE-MOVE-PARA.
+       IF WS-PIECE-COLLISION = 0 THEN
+       EVALUATE WS-DIR
+       WHEN "A"
+       SUBTRACT 1 FROM WS-REL-COL
+       WHEN "D"
+       ADD 1 TO WS-REL-COL
+       END-EVALUATE.
+
+       
+
       *=================================================================
       *   SET THE POSITION OF THE PLAYER INSIDE THE BOARD ARRAY
       *   DELETE THE LAST POSITION SO YOU DO NOT LEAVE A TRAIL
       *=================================================================
 
        CHANGE-PLAYER-POS-PARA.
-       MOVE "/" TO WS-BOARD-COLS(WS-PREV-ROW,WS-PREV-COL)
+       MOVE WS-EMPTY-SPACE TO WS-BOARD-COLS(WS-PREV-ROW,WS-PREV-COL)
        MOVE "A" TO WS-BOARD-COLS(WS-REL-ROW,WS-REL-COL)
        CALL "DRAW_BOARD" USING BY REFERENCE WS-BOARD WS-BOARD-POS-LS 
        WS-BOARD-HEIGHT WS-BOARD-WIDTH WS-SCORE.
@@ -189,17 +234,22 @@
       *================================================================= 
 
        DROP-PIECE-PARA.
-       PERFORM CHECK-BELOW-PIECE.
-       IF WS-PLACE-PIECE = 0 THEN
+       MOVE "S" TO WS-DIR.
+       PERFORM CHECK-BEFORE-MOVE-PARA.
+       IF WS-PIECE-COLLISION = 0 THEN
        ADD 1 TO WS-REL-ROW
        ELSE 
        MOVE "A" TO WS-BOARD-COLS(WS-REL-ROW,WS-REL-COL)
-       MOVE WS-PIECE-START-POS TO WS-REL-PLAYERPOS-LS
-       MOVE WS-PIECE-START-POS TO WS-PREV-PLAYERPOS-LS
+       CALL "CHECK_AND_CLEAR_ROWS" USING 
+       WS-BOARD WS-EMPTY-SPACE WS-REL-ROW
+       PERFORM RESET-POSITION-PARA
        END-IF.
        PERFORM CHANGE-PLAYER-POS-PARA.
-
-
+       
+       RESET-POSITION-PARA.
+       MOVE WS-PIECE-START-POS TO WS-REL-PLAYERPOS-LS.
+       MOVE WS-PIECE-START-POS TO WS-PREV-PLAYERPOS-LS.
+       
       *=================================================================
       *    HANDLE PLAYER MOVEMENT END
       *=================================================================
@@ -216,8 +266,8 @@
        MOVE WS-START-TIME-DATA TO WS-LAST-DROP-TIME.
 
        CLOCK-PARA.
-      *clock function that runs each game cycle (determined by player input intake)
-      *gets the current date, calculates the time since start, and time since last drop
+      *clock function that runs each game cycle (determined by player input inta
+      *gets the current date, calculates the time since start, and time since la
       *check if its time to drop the piece
       *display time stats at bottom of screen
        MOVE FUNCTION CURRENT-DATE TO WS-CURRENT-TIME-DATA.
@@ -236,14 +286,14 @@
        DISPLAY WS-TIME-SINCE-DROP AT 5101.
 
        CHECK-TIME-PARA.
-      *check time since last drop vs time before drop to see if the piece should drop, then reset time last drop time to the current time
+      *check time since last drop vs time before drop to see if the piece should
        IF WS-TIME-SINCE-DROP > WS-TIME-BEFORE-DROP THEN
        PERFORM DROP-PIECE-PARA
        COMPUTE WS-LAST-DROP-TIME = (WS-CURRENT-DATE/1000)
        END-IF.
 
        RESET-DROP-PARA.
-      *function called when player moves piece down manually, just resets the last drop time to current time
+      *function called when player moves piece down manually, just resets the la
        MOVE FUNCTION CURRENT-DATE TO WS-CURRENT-TIME-DATA.
        CALL "CONVERT_TIME_TO_SEC" USING WS-CURRENT-TIME-DATA.
        COMPUTE WS-LAST-DROP-TIME = WS-CURRENT-DATE/1000.
@@ -253,3 +303,5 @@
       *=================================================================
       *    MAIN PROGRAM END
       *=================================================================
+
+

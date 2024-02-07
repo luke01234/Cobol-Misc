@@ -27,7 +27,7 @@
        01  LS-WIDTH          PIC 9(2).
        01  LI-SCORE          PIC 9(10).
 
-       PROCEDURE DIVISION USING BY REFERENCE 
+       PROCEDURE DIVISION USING 
        LI-BOARD LI-STARTING-POS LI-HEIGHT LS-WIDTH LI-SCORE.
        DISPLAY LI-SCORE AT 0101.
        
@@ -68,3 +68,4 @@
       *=================================================================
       *    DRAW BOARD END
       *=================================================================
+
