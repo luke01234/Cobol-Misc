@@ -8,7 +8,7 @@
        01 remain    PIC 9(1).
        procedure division.
        main-PARA.
-       display "Please enter an interger (10 Digits MAX)".
+       display "Please enter an integer (10 Digits MAX)".
        accept inputVar.
        perform function-PARA.
        
@@ -17,7 +17,7 @@
        function-PARA.
        DIVIDE inputVar BY 2 GIVING result REMAINDER remain.
        IF remain = 0 THEN
-       display "Interger is Even."
+       display "integer is Even."
        ELSE
-       display "Interger is Odd."
+       display "integer is Odd."
        END-IF.
