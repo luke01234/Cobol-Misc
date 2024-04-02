@@ -5,7 +5,7 @@ COBC = cobc
 COBFLAGS = -x
 
 # Source files
-COBOL_SOURCES = cobol_tetris.cob DRAW_BOARD.cob CONVERT_TIME_TO_SEC.cob MAKE_BORDER.cob CHECK_AND_CLEAR_ROWS.cob
+COBOL_SOURCES = cobol_tetris.cob DRAW_BOARD.cob CONVERT_TIME_TO_SEC.cob MAKE_BORDER.cob CHECK_AND_CLEAR_ROWS.cob INITIALIZE_PIECES.cob GET_NEXT_PIECE.cob
 
 # Output executable
 EXECUTABLE = cobol_tetris
