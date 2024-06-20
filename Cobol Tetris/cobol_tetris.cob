@@ -16,15 +16,31 @@
            05 WS-BOARD-POS-ROW   PIC 9(2) VALUE 4.
            05 WS-BOARD-POS-COL   PIC 9(2) VALUE 4.
 
+       01  WS-NEXT-BOARD-POS-LS.
+           05 WS-NEXT-BOARD-POS-ROW   PIC 9(2) VALUE 4.
+           05 WS-NEXT-BOARD-POS-COL   PIC 9(2) VALUE 35.
+       
        01  WS-BOARD-HEIGHT   PIC 9(2)    VALUE 20.
        01  WS-BOARD-WIDTH    PIC 9(2)    VALUE 10.
       
+       01  WS-NEXT-BOARD-SIZE-LS.
+           05  WS-NEXT-BOARD-HEIGHT   PIC 9(2)    VALUE 5.
+           05  WS-NEXT-BOARD-WIDTH    PIC 9(2)    VALUE 5.
+
        01  WS-EMPTY-SPACE          PIC X(1) VALUE ".".
 
        01  WS-BOARD.       
            05  WS-BOARD-ROW OCCURS 20 TIMES.
                06  WS-BOARD-COLS OCCURS 10 TIMES.
                    07  WS-BOARD-VAL    PIC X(1) VALUE ".".
+       
+       01  WS-NEXT-BOARD.       
+           05  WS-NEXT-BOARD-ROW OCCURS 5 TIMES.
+               06  WS-NEXT-BOARD-COLS OCCURS 5 TIMES.
+                   07  WS-NEXT-BOARD-VAL    PIC X(1) VALUE ".".
+       
+       01  WS-NEXT-DISPLAY-POSITION PIC 9(4) VALUE 0335.
+
        
       *=================================================================
       *   GAME STATE AND SCORE
@@ -61,6 +77,12 @@
        01  WS-PIECE-START-POS-LS.
            05 WS-START-ROW PIC S9(2) VALUE +01.
            05 WS-START-COL PIC S9(2) VALUE +04.        
+
+       01  WS-NEXT-PIECE-POS-LS.
+           05 WS-NEXT-ROW  PIC S9(2) VALUE +5.
+           05 WS-NEXT-COL  PIC S9(2) VALUE +41.
+       
+       01  WS-NEXT-TEST PIC 9(4).
        
        01  WS-INP            PIC X(1).
 
@@ -83,6 +105,8 @@
        01  WS-SEED              PIC 9(8).
 
        01  WS-ROTATION          PIC 9(1) VALUE 1.
+
+       01  WS-HAS-SWAPPED       PIC 9(1) VALUE 0.
 
       *=================================================================
       *   TIME VARS
@@ -118,7 +142,7 @@
       *=================================================================
       *   BOUNDARY VARS
       *=================================================================
-
+      
        01  LO-TOP-BOUND       PIC 9(2).
        01  LO-BOTTOM-BOUND    PIC 9(2).
        01  LO-RIGHT-BOUND     PIC 9(2).
@@ -145,7 +169,8 @@
        CALL "GET_NEXT_PIECE" USING WS-NEXT-PIECE.
        
        CALL "MAKE_BORDER" USING 
-       WS-BOARD-POS-LS WS-BOARD-HEIGHT WS-BOARD-WIDTH.
+       WS-BOARD-POS-LS WS-BOARD-HEIGHT WS-BOARD-WIDTH
+       WS-NEXT-DISPLAY-POSITION.
        PERFORM RESET-POSITION-PARA.
 
       *=================================================================
@@ -156,7 +181,6 @@
 
        PERFORM CLOCK-PARA
        ACCEPT WS-INP AT 5001 WITH AUTO-SKIP TIME-OUT AFTER 1 
-
          
        PERFORM NEW-PLAYER-MOVE-PARA
        
@@ -211,6 +235,14 @@
        EXIT PARAGRAPH
        
        WHEN "Q"
+       IF WS-HAS-SWAPPED <> 1 THEN
+       PERFORM RESET-POSITION-PARA
+       MOVE 1 TO WS-ROTATION
+       MOVE WS-CURRENT-PIECE TO LO-TEMP-NUM
+       MOVE WS-NEXT-PIECE TO WS-CURRENT-PIECE
+       MOVE LO-TEMP-NUM TO WS-NEXT-PIECE
+       MOVE 1 TO WS-HAS-SWAPPED
+       END-IF
        EXIT PARAGRAPH
        
        WHEN "S"
@@ -258,7 +290,7 @@
        IF LO-TEMP-CHAR <> WS-EMPTY-SPACE OR LO-COL-TEMP < 1 OR 
        LO-COL-TEMP > 10 OR LO-ROW-TEMP > 20 THEN
        MOVE 1 TO WS-PIECE-COLLISION
-       DISPLAY "COLLISION" AT 4130 
+      * DISPLAY "COLLISION" AT 4130 
        EXIT PARAGRAPH
        END-PERFORM.
        
@@ -274,8 +306,11 @@
        PERFORM DRAW-CURRENT-PIECE-PARA.
        CALL "DRAW_BOARD" USING BY REFERENCE WS-BOARD WS-BOARD-POS-LS 
        WS-BOARD-HEIGHT WS-BOARD-WIDTH WS-SCORE.
+       CALL "DRAW_NEXT" USING BY REFERENCE WS-NEXT-BOARD 
+       WS-NEXT-BOARD-POS-LS WS-NEXT-BOARD-HEIGHT WS-NEXT-BOARD-WIDTH.
        PERFORM CLEAR-SHADOW-PIECE-PARA.
        PERFORM CLEAR-CURRENT-PIECE-PARA.
+       PERFORM DRAW-NEXT-PIECE-PARA.
        MOVE WS-REL-PLAYERPOS-LS TO WS-PREV-PLAYERPOS-LS.
 
        
@@ -307,7 +342,7 @@
        MOVE WS-EMPTY-SPACE TO WS-BOARD-COLS(LO-ROW-TEMP,LO-COL-TEMP)
        END-PERFORM.
 
-       DRAW-CURRENT-PIECE-PARA.
+       DRAW-CURRENT-PIECE-PARA. 
        PERFORM VARYING LO-TEMP-NUM FROM 1 BY 1 UNTIL LO-TEMP-NUM = 5
        COMPUTE LO-ROW-TEMP = WS-REL-ROW + 
        WS-PIECE-ROW(WS-CURRENT-PIECE, WS-ROTATION, LO-TEMP-NUM)
@@ -315,8 +350,20 @@
        WS-PIECE-COL(WS-CURRENT-PIECE, WS-ROTATION, LO-TEMP-NUM)
        MOVE WS-CURRENT-PIECE TO WS-BOARD-COLS(LO-ROW-TEMP,LO-COL-TEMP)
        END-PERFORM.
+
+       DRAW-NEXT-PIECE-PARA.
+       PERFORM VARYING LO-TEMP-NUM FROM 1 BY 1 UNTIL LO-TEMP-NUM = 5
+       COMPUTE LO-ROW-TEMP = WS-NEXT-ROW + 
+       WS-PIECE-ROW(WS-NEXT-PIECE, 1, LO-TEMP-NUM)
+       COMPUTE LO-COL-TEMP = WS-NEXT-COL + 
+       WS-PIECE-COL(WS-NEXT-PIECE, 1, LO-TEMP-NUM)
+       COMPUTE WS-NEXT-TEST = LO-ROW-TEMP * 100 + LO-COL-TEMP 
+       DISPLAY WS-NEXT-PIECE AT WS-NEXT-TEST
+      * MOVE WS-CURRENT-PIECE TO WS-BOARD-COLS(LO-ROW-TEMP,LO-COL-TEMP)
+       END-PERFORM.
        
        PLACE-CURRENT-PIECE-PARA.
+       MOVE 0 TO WS-HAS-SWAPPED.
        PERFORM DRAW-CURRENT-PIECE-PARA.
        MOVE WS-NEXT-PIECE TO WS-CURRENT-PIECE.
        MOVE 0 TO WS-CLEARED-ROWS.
